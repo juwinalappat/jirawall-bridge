@@ -13,7 +13,7 @@
 // Hosted on a normal https page so YouTube sees a Referer. The new tab talks to this page with postMessage.
 // Plan A: YouTube's player script. Plan B (if that script is blocked): a plain embed driven by postMessage.
 (function () {
-  var VER = 5;
+  var VER = 6;
   var q = new URLSearchParams(location.search);
   var list = q.get('list'), video = q.get('video');
   var wantVol = clamp(Number(q.get('volume') || 55));
@@ -64,16 +64,22 @@
     stage('YouTube player code loaded, creating player');
     var vars = { autoplay: 1, controls: 0, rel: 0, playsinline: 1, modestbranding: 1, iv_load_policy: 3, origin: location.origin };
     if (list) { vars.listType = 'playlist'; vars.list = list; }
-    player = new YT.Player('p', {
+    var opts = {
       width: '100%', height: '100%',
-      videoId: list ? undefined : video,
       playerVars: vars,
       events: {
         onReady: function () { if (!fb) onReady(); },
         onStateChange: function (e) { if (!fb) onState(e); },
         onError: function (e) { fail(e.data, 'YouTube error ' + e.data); }
       }
-    });
+    };
+    if (!list) opts.videoId = video;     // a playlist must NOT carry a videoId key, even an empty one: YouTube throws "Invalid video id"
+    try {
+      player = new YT.Player('p', opts);
+    } catch (err) {
+      startFallback('player script error: ' + (err && err.message));
+      return;
+    }
     setTimeout(function () { if (!ready && !fb) startFallback('player did not answer'); }, 8000);
   };
 
